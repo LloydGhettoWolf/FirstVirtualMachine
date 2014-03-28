@@ -1,39 +1,5 @@
 /* virtual machine*/
-#include <stdio.h>
-#include <math.h>
-#include <stdlib.h>
-#include <assert.h>
-
-#define MEMORY_SIZE    65536
-#define NUM_REGISTERS  16
-#define STACK_ENTRIES  256
-
-typedef struct _vm
-{
-	unsigned char instructions[MEMORY_SIZE];
-	int registers[NUM_REGISTERS];
-	int stack[STACK_ENTRIES];
-
-	unsigned short instructionPtr;
-	unsigned char  stackPtr;
-}VirtualMachine;
-
-void LoadProgram(VirtualMachine* vm,FILE* file);
-void Execute(VirtualMachine* vm);
-void Push(VirtualMachine* vm,int value);
-int  Pop(VirtualMachine* vm);
-void Load(VirtualMachine* vm,unsigned char reg);
-void Store(VirtualMachine* vm,unsigned char reg);
-void Jump(VirtualMachine* vm,unsigned short instructionIndex);
-void JumpIfZero(VirtualMachine* vm,unsigned short instructionIndex);
-void JumpIfNotZero(VirtualMachine* vm,unsigned short instructionIndex);
-void Add(VirtualMachine* vm);
-void Sub(VirtualMachine* vm);
-void Mul(VirtualMachine* vm);
-void Div(VirtualMachine* vm);
-void Print(VirtualMachine* vm);
-void DataCheck();
-void InitVM(VirtualMachine* vm);
+#include "VM.h"
 
 int main(int argc,char* argv[])
 {
@@ -43,7 +9,6 @@ int main(int argc,char* argv[])
 	vm.stackPtr = 0;
 	vm.instructionPtr = 0;
 
-	DataCheck();
 	InitVM(&vm);
 
 	/*check that a file name has been given*/
@@ -79,7 +44,7 @@ void LoadProgram(VirtualMachine* vm,FILE* file)
 void Execute(VirtualMachine* vm)
 {
 	int arg;
-	unsigned char reg;
+	unsigned char reg1,reg2;
 	unsigned short instruction;
 
 	while(1)
@@ -100,13 +65,13 @@ void Execute(VirtualMachine* vm)
 				(*vm).instructionPtr++;
 				break;
 			case 0x03:
-				reg = ((*vm).instructions[(*vm).instructionPtr+1]);
-				Load(vm,reg);
+				reg1 = ((*vm).instructions[(*vm).instructionPtr+1]);
+				Load(vm,reg1);
 				(*vm).instructionPtr += 2;
 				break;
 			case 0x04:
-				reg = ((*vm).instructions[(*vm).instructionPtr+1]);
-				Store(vm,reg);
+				reg1 = ((*vm).instructions[(*vm).instructionPtr+1]);
+				Store(vm,reg1);
 				(*vm).instructionPtr += 2;
 				break;
 			case 0x05:
@@ -126,22 +91,71 @@ void Execute(VirtualMachine* vm)
 				(*vm).instructionPtr++;
 				break;
 			case 0x09:
+				reg1 = ((*vm).instructions[(*vm).instructionPtr+1]);
+				reg2 = ((*vm).instructions[(*vm).instructionPtr+2]);
+				Add(vm,reg1,reg2);
+				(*vm).instructionPtr+=3;
+				break;
+			case 0xA:
+				reg1 = ((*vm).instructions[(*vm).instructionPtr+1]);
+				arg  = (int)((*vm).instructions[(*vm).instructionPtr+2]);
+				Add(vm,reg1,arg);
+				(*vm).instructionPtr+=6;
+				break;
+			case 0xB:
 				Sub(vm);
 				(*vm).instructionPtr++;
 				break;
-			case 0xA:
+			case 0xC:
+				reg1 = ((*vm).instructions[(*vm).instructionPtr+1]);
+				reg2 = ((*vm).instructions[(*vm).instructionPtr+2]);
+				Sub(vm,reg1,reg2);
+				(*vm).instructionPtr+=3;
+				break;
+			case 0xD:
+				reg1 = ((*vm).instructions[(*vm).instructionPtr+1]);
+				arg  = (int)((*vm).instructions[(*vm).instructionPtr+2]);
+				Sub(vm,reg1,arg);
+				(*vm).instructionPtr+=6;
+				break;
+			case 0xE:
 				Mul(vm);
 				(*vm).instructionPtr++;
 				break;
-			case 0xB:
+			case 0xF:
+				reg1 = ((*vm).instructions[(*vm).instructionPtr+1]);
+				reg2 = ((*vm).instructions[(*vm).instructionPtr+2]);
+				Mul(vm,reg1,reg2);
+				(*vm).instructionPtr+=3;
+				break;
+			case 0x10:
+				reg1 = ((*vm).instructions[(*vm).instructionPtr+1]);
+				arg  = (int)((*vm).instructions[(*vm).instructionPtr+2]);
+				Mul(vm,reg1,arg);
+				(*vm).instructionPtr+=6;
+				break;
+			case 0x11:
 				Div(vm);
 				(*vm).instructionPtr++;
 				break;
-			case 0xC:
+			case 0x12:
+				reg1 = ((*vm).instructions[(*vm).instructionPtr+1]);
+				reg2 = ((*vm).instructions[(*vm).instructionPtr+2]);
+				Div(vm,reg1,reg2);
+				(*vm).instructionPtr+=3;
+				break;
+			case 0x13:
+				reg1 = ((*vm).instructions[(*vm).instructionPtr+1]);
+				arg  = (int)((*vm).instructions[(*vm).instructionPtr+2]);
+				Div(vm,reg1,arg);
+				(*vm).instructionPtr+=6;
+				break;
+			case 0x14:
 				Print(vm);
 				(*vm).instructionPtr++;
 				break;
-			case 0xD:
+			case 0x15:
+				/* stop*/
 				return;
 			default:
 				return;
@@ -218,12 +232,32 @@ void Add(VirtualMachine* vm)
 	Push(vm,arg1+arg2);
 }
 
+void Add(VirtualMachine* vm,unsigned char reg1,unsigned char reg2)
+{
+	(*vm).registers[reg1] += (*vm).registers[reg2];
+}
+
+void Add(VirtualMachine* vm,unsigned char reg1,int arg)
+{
+	(*vm).registers[reg1] += arg;
+}
+
 void Sub(VirtualMachine* vm)
 {
 	int arg1 = Pop(vm);
 	int arg2 = Pop(vm);
 
 	Push(vm,arg2-arg1);
+}
+
+void Sub(VirtualMachine* vm,unsigned char reg1,unsigned char reg2)
+{
+	(*vm).registers[reg1] -= (*vm).registers[reg2];
+}
+
+void Sub(VirtualMachine* vm,unsigned char reg1,int arg)
+{
+	(*vm).registers[reg1] -= arg;
 }
 
 void Mul(VirtualMachine* vm)
@@ -234,12 +268,32 @@ void Mul(VirtualMachine* vm)
 	Push(vm,arg1*arg2);
 }
 
+void Mul(VirtualMachine* vm,unsigned char reg1,unsigned char reg2)
+{
+	(*vm).registers[reg1] *= (*vm).registers[reg2];
+}
+
+void Mul(VirtualMachine* vm,unsigned char reg1,int arg)
+{
+	(*vm).registers[reg1] *= arg;
+}
+
 void Div(VirtualMachine* vm)
 {
 	int arg1 = Pop(vm);
 	int arg2 = Pop(vm);
 
 	Push(vm,arg2/arg1);
+}
+
+void Div(VirtualMachine* vm,unsigned char reg1,unsigned char reg2)
+{
+	(*vm).registers[reg1] /= (*vm).registers[reg2];
+}
+
+void Div(VirtualMachine* vm,unsigned char reg1,int arg)
+{
+	(*vm).registers[reg1] /= arg;
 }
 
 void Print(VirtualMachine* vm)
